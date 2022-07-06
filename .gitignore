@@ -49,3 +49,7 @@ waves/*/*
 *.vpl
 *.vpi
 *.o
+
+/.bloop
+/.metals
+/project
