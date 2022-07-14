@@ -57,68 +57,78 @@ case class PixelSolver(g: PixelSolverGenerics) extends Component {
   val mulStageContext = Stream(MulStageContext())
   val addStageContext = Stream(AddStageContext())
   val routerContext   = Stream(RouterContext())
-  io.rsp.valid.clear
-  io.rsp.payload.iteration.clearAll
 
   val inserter = new Area {
     val freeId   = Counter(1 << idWidth, inc = io.cmd.fire)
     val loopback = routerContext
     val output   = inserterContext
-    output.valid := loopback.valid || io.cmd.valid
-    when((!loopback.valid) && io.cmd.valid) {
-      output.id := freeId
-      output.x0 := io.cmd.payload.x
-      output.y0 := io.cmd.payload.y
-      output.iteration.clearAll
-      output.done.clear
-      output.x := 0
-      output.y := 0
-    } otherwise {
-      output.payload.assignSomeByName(loopback.payload)
-    }
-    io.cmd.ready := !loopback.valid && output.ready
-
-    loopback.ready := output.ready
+    output <-< StreamArbiterFactory.lowerFirst.noLock.onArgs(
+      loopback.translateWith {
+        val payload = InserterContext()
+        payload.assignSomeByName(loopback.payload)
+        payload
+      },
+      io.cmd.translateWith {
+        val payload = InserterContext()
+        payload.id := freeId
+        payload.x0 := io.cmd.payload.x
+        payload.y0 := io.cmd.payload.y
+        payload.iteration.clearAll
+        payload.done.clear
+        payload.x := 0
+        payload.y := 0
+        payload
+      }
+    )
   }
 
   val mulStage = new Area {
-    val input  = inserterContext.stage
+    val input  = inserterContext
     val output = mulStageContext
-    output.valid := input.valid
-    output.payload.assignSomeByName(input.payload)
-    output.xx := (input.x * input.x).truncated
-    output.yy := (input.y * input.y).truncated
-    output.xy := (input.x * input.y).truncated
 
-    input.ready := output.ready
+    val payload = MulStageContext()
+    payload.assignSomeByName(input.payload)
+    payload.xx := (input.x * input.x).truncated
+    payload.yy := (input.y * input.y).truncated
+    payload.xy := (input.x * input.y).truncated
+
+    output <-< input.translateWith(payload)
   }
 
   val addStage = new Area {
-    val input  = mulStageContext.stage
+    val input  = mulStageContext
     val output = addStageContext
-    output.valid := input.valid
-    output.payload.assignSomeByName(input.payload)
-    output.x := input.xx - input.yy + input.x0
-    output.y := input.xy + input.xy + input.y0
-    output.done.allowOverride
-    output.iteration.allowOverride
-    output.done      := input.done || input.xx + input.yy >= 4 || input.iteration === iterationLimit
-    output.iteration := input.iteration + (!output.done).asUInt
 
-    input.ready := output.ready
+    val payload = AddStageContext()
+    payload.assignSomeByName(input.payload)
+    payload.x := input.xx - input.yy + input.x0
+    payload.y := input.xy + input.xy + input.y0
+    payload.done.allowOverride
+    payload.iteration.allowOverride
+    payload.done      := input.done || input.xx + input.yy >= 4 || input.iteration === iterationLimit
+    payload.iteration := input.iteration + (!payload.done).asUInt
+
+    output <-< input.translateWith(payload)
   }
 
   val router = new Area {
     val wantedId = Counter(1 << idWidth, inc = io.rsp.fire)
-    val input    = addStageContext.stage
+    val input    = addStageContext
     val loopback = routerContext
-    when(input.done && wantedId === input.id) {
-      io.rsp.valid             := input.valid
-      io.rsp.payload.iteration := input.iteration
-    }
-    input.ready := !(wantedId === input.id && input.done && !io.rsp.fire)
 
-    loopback.payload.assignSomeByName(input.payload)
-    loopback.valid := input.valid && (!input.done || wantedId =/= input.id )
+    val outputs = StreamDemux(input, (input.done && wantedId === input.id).asUInt, 2)
+
+    io.rsp << outputs(1).translateWith {
+      val payload = io.rsp.payloadType()
+      payload.iteration := outputs(1).iteration
+      payload
+    }
+
+    loopback </< outputs(0).translateWith {
+      val payload = RouterContext()
+      payload.assignSomeByName(outputs(0).payload)
+      payload
+    }
+
   }
 }
