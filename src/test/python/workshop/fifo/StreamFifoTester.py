@@ -7,26 +7,26 @@ from cocotb.triggers import RisingEdge, Timer
 
 
 @cocotb.coroutine
-def genClockAndReset(dut):
+async def genClockAndReset(dut):
     dut.reset.value = 1
     dut.clk.value = 0
-    yield Timer(1000)
+    await Timer(1000)
     dut.reset.value = 0
-    yield Timer(1000)
+    await Timer(1000)
     while True:
         dut.clk.value = 1
-        yield Timer(500)
+        await Timer(500)
         dut.clk.value = 0
-        yield Timer(500)
+        await Timer(500)
 
 
 @cocotb.coroutine
-def driverAgent(dut):
+async def driverAgent(dut):
     dut.io_push_valid.value = 0
     dut.io_pop_ready.value = 0
     dut.io_push_payload.value = 0
     while True:
-        yield RisingEdge(dut.clk)
+        await RisingEdge(dut.clk)
         # TODO generate random stimulus on the hardware
         dut.io_push_valid.value = random.random() < 0.3
         dut.io_pop_ready.value = random.random() < 0.3
@@ -34,11 +34,11 @@ def driverAgent(dut):
 
 
 @cocotb.coroutine
-def checkerAgent(dut):
+async def checkerAgent(dut):
     queue = Queue()
     matchCounter = 0
     while matchCounter < 5000:
-        yield RisingEdge(dut.clk)
+        await RisingEdge(dut.clk)
         # TODO Capture and store 'push' transactions into the queue
         if dut.io_push_valid.value and dut.io_push_ready.value:
             queue.put(int(dut.io_push_payload.value))  # !!!

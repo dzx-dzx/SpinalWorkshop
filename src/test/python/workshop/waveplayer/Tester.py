@@ -5,8 +5,8 @@ from math import sin
 import math
 
 import cocotb
-from cocotb.drivers.amba import AXI4LiteMaster
-from cocotb.scoreboard import Scoreboard
+from cocotb_bus.drivers.amba import AXI4LiteMaster
+from cocotb_bus.scoreboard import Scoreboard
 from cocotb.triggers import RisingEdge, Timer
 
 from cocotblib.Phase import PhaseManager, Infrastructure, PHASE_SIM

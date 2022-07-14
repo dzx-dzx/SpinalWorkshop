@@ -7,9 +7,9 @@ from cocotb.clock import Clock
 
 
 @cocotb.coroutine
-def genClockAndReset(dut):
+async def genClockAndReset(dut):
     dut.reset.value = 1
-    yield Timer(1000)
+    await Timer(1000)
     dut.reset.value = 0
     cocotb.start_soon(Clock(dut.clk, 10, 'ns').start())
     # TODO Animate the dut.clk and dut.reset
