@@ -2,7 +2,7 @@ import random
 from queue import Queue
 
 import cocotb
-from cocotb.scoreboard import Scoreboard
+from cocotb_bus.scoreboard import Scoreboard
 from cocotb.triggers import RisingEdge
 
 from cocotblib.Phase import PhaseManager, Infrastructure, PHASE_SIM
