@@ -2,7 +2,7 @@ import random
 from queue import Queue
 
 import cocotb
-from cocotb.scoreboard import Scoreboard
+from cocotb_bus.scoreboard import Scoreboard
 from cocotb.triggers import RisingEdge, Timer
 
 from cocotblib.Phase import PhaseManager, Infrastructure, PHASE_SIM
@@ -11,7 +11,7 @@ from cocotblib.Stream import StreamDriverMaster, Stream, Transaction, StreamDriv
 from cocotblib.misc import ClockDomainAsyncReset, simulationSpeedPrinter, randBits
 
 import socket
-import thread
+from threading import Thread
 from _socket import SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST
 
 SERVER_PORT = 37984
@@ -32,15 +32,16 @@ class DriverAgent(Infrastructure):
         StreamDriverSlave(Stream(dut, "io_tx_data"), dut.clk, dut.reset)
 
         try:
-            thread.start_new_thread(self.rxThread, ())
+            Thread(target=self.rxThread, args=()).start()
         except Exception as errtxt:
-            print errtxt
+            print (errtxt)
 
 
     def rxThread(self):
+        print("Starting rxThread")
         while True:
             data, addr = self.sock.recvfrom(2048)
-            print "received message:", data, addr
+            print ("received message:", data, addr)
 
             cmdTrans = Transaction()
             ipSplit = addr[0].split(".")
@@ -56,7 +57,7 @@ class DriverAgent(Infrastructure):
             for i in range(len(data)):
                 dataTrans = Transaction()
                 dataTrans.last = (i == len(data)-1)
-                dataTrans.fragment = ord(data[i])
+                dataTrans.fragment = data[i]
                 self.rxDataQueue.put(dataTrans)
 
             self.clkTocken[0] += 1000
@@ -113,7 +114,8 @@ class MonitorAgent(Infrastructure):
                 for i in range(cmd.length):
                     data = self.txDataQueue.get()
                     payload += chr(data.fragment)
-                self.sock.sendto(payload, (ip, cmd.dstPort))
+                print(f"Sending {payload} to {ip}:{cmd.dstPort}")
+                self.sock.sendto(bytes(payload,"ascii"), (ip, cmd.dstPort))
 
     def hasEnoughSim(self):
         return False #time.time() - self.bootTime > 120.0

@@ -1,5 +1,5 @@
 import socket
-import thread
+from threading import Thread
 
 import time
 
@@ -18,16 +18,16 @@ sock.bind((RX_IP, 0))
 def rxThread(sock,dummy):
     while True:
         data, addr = sock.recvfrom(2048)
-        print "received message:", data, addr
+        print ("received message:", data, addr)
 
 try:
-    thread.start_new_thread(rxThread, (sock,1))
+    Thread(target=rxThread, args=(sock,1)).start()
 except Exception as errtxt:
-    print errtxt
+    print (errtxt)
 
-print("Send request")
-sock.sendto(chr(0x11), (TX_IP, SERVER_PORT))
+print(f"Send request to {TX_IP}:{SERVER_PORT}")
+sock.sendto(b'\x11\x02', (TX_IP, SERVER_PORT))
 print("Wait two seconds for answers")
 
-time.sleep(2)
+time.sleep(3)
 print("Done")
